@@ -20,18 +20,18 @@ let TODAY = DateTime.Now;
 let TOMORROW = (DateTime.Now).AddDays(1.);
 let INNDAYS n = (DateTime.Now).AddDays(n);
 
+let requestMock = {
+  UserId = 1
+  RequestId = Guid.Empty
+  Start = { Date = TOMORROW; HalfDay = AM }
+  End = { Date = INNDAYS 5.; HalfDay = PM } }
+
 let creationTests =
   testList "Creation tests" [
     test "A request is created in the future" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 10.; HalfDay = PM } }
-
       Given [ ]
-      |> When (RequestTimeOff request)
-      |> Then (Ok [RequestCreated request]) "The request has been created"
+      |> When (RequestTimeOff requestMock)
+      |> Then (Ok [RequestCreated requestMock]) "The request has been created"
     }
 
     test "A request is created today" {
@@ -47,19 +47,13 @@ let creationTests =
     }
 
     test "A new request doesn't overlap" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 5.; HalfDay = PM } }
-
       let notOverlapping = {
         UserId = 1
         RequestId = Guid.Empty
         Start = { Date = INNDAYS 10.; HalfDay = AM }
         End = { Date = INNDAYS 15.; HalfDay = PM } }
 
-      Given [ RequestValidated request]
+      Given [ RequestValidated requestMock]
       |> When (RequestTimeOff notOverlapping)
       |> Then (Ok [RequestCreated notOverlapping]) "The request has been created"
     }
@@ -109,52 +103,28 @@ let creationTests =
 let validationTests =
   testList "Validation tests" [
     test "A request is validated" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 5.; HalfDay = PM } }
-
-      Given [ RequestCreated request ]
+      Given [ RequestCreated requestMock ]
       |> When (ValidateRequest (1, Guid.Empty))
-      |> Then (Ok [RequestValidated request]) "The request has been validated"
+      |> Then (Ok [RequestValidated requestMock]) "The request has been validated"
     }
   ]
 
 let refusalTests =
   testList "Refusal tests" [
     test "A request is refused" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 5.; HalfDay = PM } }
-
-      Given [ RequestCreated request ]
+      Given [ RequestCreated requestMock ]
       |> When (RefuseRequest (1, Guid.Empty))
-      |> Then (Ok [RequestRefused request]) "The request has been refused"
+      |> Then (Ok [RequestRefused requestMock]) "The request has been refused"
     }
 
     test "A request is already refused" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 5.; HalfDay = PM } }
-
-      Given [ RequestRefused request ]
+      Given [ RequestRefused requestMock ]
       |> When (RefuseRequest (1, Guid.Empty))
       |> Then (Error "Request already refused") ""
     }
     
     test "A request cannot be refused" {
-      let request = {
-        UserId = 1
-        RequestId = Guid.Empty
-        Start = { Date = TOMORROW; HalfDay = AM }
-        End = { Date = INNDAYS 5.; HalfDay = PM } }
-
-      Given [ RequestValidated request ]
+      Given [ RequestValidated requestMock ]
       |> When (RefuseRequest (1, Guid.Empty))
       |> Then (Error "Request cannot be refused") ""
     }
