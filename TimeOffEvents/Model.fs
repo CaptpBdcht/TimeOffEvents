@@ -27,6 +27,7 @@ type Command =
     | EmployeeCancelRequest of UserId * Guid * User
     | ManagerCancelRequest of UserId * Guid * User
     | AskCancelRequest of UserId * Guid * User
+    | RefuseCancelRequest of UserId * Guid * User
     | ValidateRequest of UserId * Guid * User with
     member this.UserId =
         match this with
@@ -35,6 +36,7 @@ type Command =
         | EmployeeCancelRequest (userId, _, _) -> userId
         | ManagerCancelRequest (userId, _, _) -> userId
         | AskCancelRequest (userId, _, _) -> userId
+        | RefuseCancelRequest (userId, _, _) -> userId
         | ValidateRequest (userId, _, _) -> userId
     member this.User =
         match this with
@@ -43,6 +45,7 @@ type Command =
         | EmployeeCancelRequest (_, _, user) -> Some user
         | ManagerCancelRequest (_, _, user) -> Some user
         | AskCancelRequest (_, _, user) -> Some user
+        | RefuseCancelRequest (_, _, user) -> Some user
         | ValidateRequest (_, _, user) -> Some user
 
 type RequestEvent =
@@ -165,6 +168,7 @@ module Logic =
     let managerCancelRequest requestState =
         match requestState with
         | PendingValidation request
+        | AskToCancel request
         | Validated request ->
             Ok [RequestManagerCancelled request]
         | _ ->
@@ -178,6 +182,15 @@ module Logic =
             Error "You can cancel that by yourself!"
         | _ ->
             Error "Request cannot be asked cancellation"
+
+    let refuseCancelRequest requestState =
+        match requestState with
+        | AskToCancel request ->
+            Ok [RequestValidated request]
+        | ManagerCancelled _ ->
+            Error "Manager already cancelled request"
+        | _ ->
+            Error "Request cannot be refused cancellation"
 
     let handleCommand (store: IStore<UserId, RequestEvent>) (command: Command) =
         let userId = command.UserId
@@ -214,6 +227,10 @@ module Logic =
                 let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
                 askCancelRequest requestState
 
+            | RefuseCancelRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                refuseCancelRequest requestState
+
             | EmployeeCancelRequest _ -> Error "Manager cannot disguise in employee"
 
         | Some Employee ->
@@ -241,5 +258,7 @@ module Logic =
             | RefuseRequest _ -> Error "Employee cannot refuse request"
 
             | ManagerCancelRequest _ -> Error "Employee cannot disguise in manager"
+
+            | RefuseCancelRequest _ -> Error "Employee cannot refuse cancellation"
 
         | None -> Error "Cannot process unknown User"

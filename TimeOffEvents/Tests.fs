@@ -190,6 +190,27 @@ let askCancelTests =
     }
   ]
 
+let refuseCancelTests =
+  testList "Refuse cancel tests" [
+    test "Requests can be refused cancellation" {
+      Given [ RequestAskCancelled requestMock ]
+      |> When (RefuseCancelRequest (1, Guid.Empty, User.Manager))
+      |> Then (Ok [RequestValidated requestMock]) "The cancellation request has been refused"
+    }
+
+    test "But only if asked to" {
+      Given [ RequestValidated requestMock ]
+      |> When (RefuseCancelRequest (1, Guid.Empty, User.Manager))
+      |> Then (Error "Request cannot be refused cancellation") ""
+    }
+
+    test "Employees cannot refuse cancellation" {
+      Given [ RequestAskCancelled requestMock ]
+      |> When (RefuseCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "Employee cannot refuse cancellation") ""
+    }
+  ]
+
 let tests =
   testList "All tests" [
     creationTests
@@ -197,4 +218,5 @@ let tests =
     refusalTests
     cancelTests
     askCancelTests
+    refuseCancelTests
   ]
