@@ -75,8 +75,12 @@ module Logic =
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
         let overlapsWith request otherRequest =
             let beforeOrEqual boundary1 boundary2 =
-                boundary1.Date < boundary2.Date ||
-                (boundary1.Date.Equals boundary2.Date && boundary1.HalfDay.Equals AM && boundary2.HalfDay.Equals PM)
+                printfn "%A" boundary1
+                printfn "%A" boundary2
+                printfn "%A" (boundary1.HalfDay.Equals AM)
+                printfn "%A" (boundary2.HalfDay.Equals PM)
+                printfn "------------------------"
+                boundary1.Date < boundary2.Date
 
             beforeOrEqual otherRequest.Start request.End &&
             beforeOrEqual request.Start otherRequest.End
@@ -113,7 +117,7 @@ module Logic =
                 |> Seq.where (fun state -> state.IsActive)
                 |> Seq.map (fun state -> state.Request)
 
-            printfn "%A" (Seq.toList activeRequests);
+            // printfn "%A" (Seq.toList activeRequests);
             createRequest activeRequests request
 
         | ValidateRequest (_, requestId) ->

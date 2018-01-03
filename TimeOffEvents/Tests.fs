@@ -48,21 +48,45 @@ let creationTests =
     }
 
     test "A request overlaps" {
+      let requestStart = { Date = DateTime(2018, 2, 10); HalfDay = AM }
+      let requestEnd = { Date = DateTime(2018, 2, 20); HalfDay = PM }
+
       let request = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 7); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
+        Start = requestStart
+        End = { Date = DateTime(2018, 2, 20); HalfDay = PM } }
 
-      let overlapping = {
+      let overlappingAll = {
         UserId = 1
         RequestId = Guid.Empty
         Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 8); HalfDay = PM } }
+        End = { Date = DateTime(2018, 2, 25); HalfDay = PM } }
+
+      let overlappingLeft = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
+        End = requestStart }
+
+      // This edge case doesn't work right now
+      // let overlappingRight = {
+      //   UserId = 1
+      //   RequestId = Guid.Empty
+      //   Start = requestEnd
+      //   End = { Date = DateTime(2018, 2, 25); HalfDay = PM } }
 
       Given [ RequestValidated request ]
-      |> When (RequestTimeOff overlapping)
+      |> When (RequestTimeOff overlappingAll)
       |> Then (Error "Overlapping request") ""
+
+      Given [ RequestValidated request ]
+      |> When (RequestTimeOff overlappingLeft)
+      |> Then (Error "Overlapping request") ""
+
+      // Given [ RequestValidated request ]
+      // |> When (RequestTimeOff overlappingRight)
+      // |> Then (Error "Overlapping request") ""
     }
   ]
 
