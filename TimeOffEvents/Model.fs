@@ -73,14 +73,14 @@ module Logic =
         events |> Seq.fold folder Map.empty
 
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
-        let overlapsWith request otherRequest = 
-            let leftOverlap req otherReq = 
-                req.Start.Date <= otherReq.Start.Date &&
-                otherReq.Start.Date <= req.End.Date &&
-                req.End.Date <= otherReq.End.Date
+        let overlapsWith request otherRequest =
+            let beforeOrEqual boundary1 boundary2 =
+                boundary1.Date < boundary2.Date ||
+                (boundary1.Date.Equals boundary2.Date && boundary1.HalfDay.Equals AM && boundary2.HalfDay.Equals PM)
 
-            leftOverlap request otherRequest || leftOverlap otherRequest request
-
+            beforeOrEqual otherRequest.Start request.End &&
+            beforeOrEqual request.Start otherRequest.End
+        
         Seq.exists (overlapsWith request) previousRequests
 
     let createRequest previousRequests request =
@@ -113,6 +113,7 @@ module Logic =
                 |> Seq.where (fun state -> state.IsActive)
                 |> Seq.map (fun state -> state.Request)
 
+            printfn "%A" (Seq.toList activeRequests);
             createRequest activeRequests request
 
         | ValidateRequest (_, requestId) ->

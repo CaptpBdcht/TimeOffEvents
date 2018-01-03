@@ -22,11 +22,47 @@ let creationTests =
         UserId = 1
         RequestId = Guid.Empty
         Start = { Date = DateTime(2018, 2, 7); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 7); HalfDay = PM } }
+        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
 
       Given [ ]
       |> When (RequestTimeOff request)
       |> Then (Ok [RequestCreated request]) "The request has been created"
+    }
+
+    test "A new request doesn't overlap" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = DateTime(2018, 2, 7); HalfDay = PM }
+        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
+
+      let notOverlapping = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
+        End = { Date = DateTime(2018, 2, 7); HalfDay = AM } }
+
+      Given [ RequestValidated request]
+      |> When (RequestTimeOff notOverlapping)
+      |> Then (Ok [RequestCreated notOverlapping]) "The request has been created"
+    }
+
+    test "A request overlaps" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = DateTime(2018, 2, 7); HalfDay = AM }
+        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
+
+      let overlapping = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
+        End = { Date = DateTime(2018, 2, 8); HalfDay = PM } }
+
+      Given [ RequestValidated request ]
+      |> When (RequestTimeOff overlapping)
+      |> Then (Error "Overlapping request") ""
     }
   ]
 
