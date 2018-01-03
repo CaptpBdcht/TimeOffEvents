@@ -26,21 +26,29 @@ type TimeOffRequest = {
 type Command =
     | RequestTimeOff of TimeOffRequest
     | RefuseRequest of UserId * Guid 
+    | EmployeeCancelRequest of UserId * Guid
+    | ManagerCancelRequest of UserId * Guid
     | ValidateRequest of UserId * Guid with
     member this.UserId =
         match this with
         | RequestTimeOff request -> request.UserId
         | RefuseRequest (userId, _) -> userId
+        | EmployeeCancelRequest (userId, _) -> userId
+        | ManagerCancelRequest (userId, _) -> userId
         | ValidateRequest (userId, _) -> userId
 
 type RequestEvent =
     | RequestCreated of TimeOffRequest
     | RequestRefused of TimeOffRequest
+    | RequestEmployeeCancelled of TimeOffRequest
+    | RequestManagerCancelled of TimeOffRequest
     | RequestValidated of TimeOffRequest with
     member this.Request =
         match this with
         | RequestCreated request -> request
         | RequestRefused request -> request
+        | RequestEmployeeCancelled request -> request
+        | RequestManagerCancelled request -> request
         | RequestValidated request -> request
 
 module Logic =
@@ -49,24 +57,32 @@ module Logic =
         | NotCreated
         | PendingValidation of TimeOffRequest
         | Refused of TimeOffRequest
+        | EmployeeCancelled of TimeOffRequest
+        | ManagerCancelled of TimeOffRequest
         | Validated of TimeOffRequest with
         member this.Request =
             match this with
             | NotCreated -> invalidOp "Not created"
             | PendingValidation request
             | Refused request -> request
+            | EmployeeCancelled request -> request
+            | ManagerCancelled request -> request
             | Validated request -> request
         member this.IsActive =
             match this with
             | NotCreated -> false
             | PendingValidation _
             | Refused _ -> false
+            | EmployeeCancelled _ -> false
+            | ManagerCancelled _ -> false
             | Validated _ -> true
 
     let evolve _ event =
         match event with
         | RequestCreated request -> PendingValidation request
         | RequestRefused request -> Refused request
+        | RequestEmployeeCancelled request -> EmployeeCancelled request
+        | RequestManagerCancelled request -> ManagerCancelled request
         | RequestValidated request -> Validated request
 
     let getRequestState events =
@@ -94,7 +110,7 @@ module Logic =
     let createRequest previousRequests request =
         let today = DateTime.Now;
 
-        // Un employé ne peut pas faire une demande qui superpose une plage existante<
+        // Un employé ne peut pas faire une demande qui superpose une plage existante
         if overlapWithAnyRequest previousRequests request then
             Error "Overlapping request"
         // "Un employé peut uniquement effectuer des demandes qui commencent à une date future"
@@ -116,6 +132,22 @@ module Logic =
             Ok [RequestRefused request]
         | Refused _ ->
             Error "Request already refused"
+        | _ ->
+            Error "Request cannot be refused"
+
+    let employeeCancelRequest requestState =
+        match requestState with
+        | PendingValidation request
+        | Validated request ->
+            Ok [RequestEmployeeCancelled request]
+        | _ ->
+            Error "Request cannot be refused"
+
+    let managerCancelRequest requestState =
+        match requestState with
+        | PendingValidation request
+        | Validated request ->
+            Ok [RequestManagerCancelled request]
         | _ ->
             Error "Request cannot be refused"
 
@@ -143,4 +175,14 @@ module Logic =
 
         | RefuseRequest (_, requestId) ->
             let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
-            refuseRequest requestState 
+            refuseRequest requestState
+
+        | EmployeeCancelRequest (_, requestId) ->
+            printfn "%A" requestId
+            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+            employeeCancelRequest requestState
+
+        | ManagerCancelRequest (userId, requestId) ->
+            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+            printfn "reqUser id: %A" requestState.Request.UserId
+            managerCancelRequest requestState 
