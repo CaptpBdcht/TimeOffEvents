@@ -161,15 +161,16 @@ module Logic =
         match requestState with
         | PendingValidation request
         | Validated request ->
-            Ok [RequestEmployeeCancelled request]
+            if requestState.Request.Start > Date.Now then
+                Ok [RequestEmployeeCancelled request]
+            else
+                Error "Cannor cancel a timeoff that already started"
         | _ ->
             Error "Request cannot be cancelled"
 
     let managerCancelRequest requestState =
         match requestState with
-        | PendingValidation request
-        | AskToCancel request
-        | Validated request ->
+        | IsActive request ->
             Ok [RequestManagerCancelled request]
         | _ ->
             Error "Request cannot be cancelled"
@@ -177,7 +178,10 @@ module Logic =
     let askCancelRequest requestState =
         match requestState with
         | Validated request ->
-            Ok [RequestAskCancelled request]
+            if requestState.Request.Start < Date.Now || requestState.Request.Start.Equals Date.Now then
+                Ok [RequestAskCancelled request]
+            else
+                Error "Cannot ask cancel for a timeoff in the future"
         | PendingValidation _ ->
             Error "You can cancel that by yourself!"
         | _ ->
