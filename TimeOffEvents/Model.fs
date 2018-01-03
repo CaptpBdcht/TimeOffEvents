@@ -21,8 +21,6 @@ type UserInfo = {
     Role: User
 }
 
-
-
 type TimeOffRequest = {
     UserId: UserId
     RequestId: Guid
@@ -190,7 +188,7 @@ module Logic =
             let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
             employeeCancelRequest requestState
 
-        | ManagerCancelRequest (userId, requestId) ->
+        | ManagerCancelRequest (_, requestId) ->
             let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
             printfn "reqUser id: %A" requestState.Request.UserId
             managerCancelRequest requestState 
