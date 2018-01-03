@@ -3,9 +3,7 @@
 open System
 open EventStorage
 
-type User =
-    | Employee of int
-    | Manager
+type User = | Employee | Manager
 
 type HalfDay = | AM | PM
 
@@ -16,11 +14,6 @@ type Boundary = {
 
 type UserId = int
 
-type UserInfo = {
-    UserId: UserId
-    Role: User
-}
-
 type TimeOffRequest = {
     UserId: UserId
     RequestId: Guid
@@ -29,18 +22,25 @@ type TimeOffRequest = {
 }
 
 type Command =
-    | RequestTimeOff of TimeOffRequest
-    | RefuseRequest of UserId * Guid 
-    | EmployeeCancelRequest of UserId * Guid
-    | ManagerCancelRequest of UserId * Guid
-    | ValidateRequest of UserId * Guid with
+    | RequestTimeOff of TimeOffRequest * User
+    | RefuseRequest of UserId * Guid * User
+    | EmployeeCancelRequest of UserId * Guid * User
+    | ManagerCancelRequest of UserId * Guid * User
+    | ValidateRequest of UserId * Guid * User with
     member this.UserId =
         match this with
-        | RequestTimeOff request -> request.UserId
-        | RefuseRequest (userId, _) -> userId
-        | EmployeeCancelRequest (userId, _) -> userId
-        | ManagerCancelRequest (userId, _) -> userId
-        | ValidateRequest (userId, _) -> userId
+        | RequestTimeOff (request, _) -> request.UserId
+        | RefuseRequest (userId, _, _) -> userId
+        | EmployeeCancelRequest (userId, _, _) -> userId
+        | ManagerCancelRequest (userId, _, _) -> userId
+        | ValidateRequest (userId, _, _) -> userId
+    member this.User =
+        match this with
+        | RequestTimeOff (_, user) -> Some user
+        | RefuseRequest (_, _, user) -> Some user
+        | EmployeeCancelRequest (_, _, user) -> Some user
+        | ManagerCancelRequest (_, _, user) -> Some user
+        | ValidateRequest (_, _, user) -> Some user
 
 type RequestEvent =
     | RequestCreated of TimeOffRequest
@@ -104,8 +104,13 @@ module Logic =
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
         let overlapsWith request otherRequest =
             let beforeOrEqual boundary1 boundary2 =
+                // Before
                 (boundary1.Date < boundary2.Date) ||
-                (boundary1.Date.Equals boundary2.Date && boundary1.HalfDay.Equals boundary2.HalfDay)
+                (boundary1.Date.Equals boundary2.Date && 
+                    // Equal
+                    (boundary1.HalfDay.Equals boundary2.HalfDay ||
+                    // Before
+                     boundary1.HalfDay.Equals AM && boundary2.HalfDay.Equals PM))
 
             beforeOrEqual otherRequest.Start request.End &&
             beforeOrEqual request.Start otherRequest.End
@@ -161,34 +166,54 @@ module Logic =
         let stream = store.GetStream userId
         let events = stream.ReadAll()
         let userRequests = getAllRequests events
-        printfn "%A" userRequests
 
-        match command with
-        | RequestTimeOff request ->
-            let activeRequests =
-                userRequests
-                |> Map.toSeq
-                |> Seq.map (fun (_, state) -> state)
-                |> Seq.where (fun state -> state.IsActive)
-                |> Seq.map (fun state -> state.Request)
+        match command.User with
+        | Some Manager ->
+            match command with
+            | RequestTimeOff (request, _) ->
+                let activeRequests =
+                    userRequests
+                    |> Map.toSeq
+                    |> Seq.map (fun (_, state) -> state)
+                    |> Seq.where (fun state -> state.IsActive)
+                    |> Seq.map (fun state -> state.Request)
 
-            // printfn "%A" (Seq.toList activeRequests);
-            createRequest activeRequests request
+                createRequest activeRequests request
 
-        | ValidateRequest (_, requestId) ->
-            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
-            validateRequest requestState
+            | ValidateRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                validateRequest requestState 
 
-        | RefuseRequest (_, requestId) ->
-            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
-            refuseRequest requestState
+            | RefuseRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                refuseRequest requestState
 
-        | EmployeeCancelRequest (_, requestId) ->
-            printfn "%A" requestId
-            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
-            employeeCancelRequest requestState
+            | ManagerCancelRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                managerCancelRequest requestState
 
-        | ManagerCancelRequest (_, requestId) ->
-            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
-            printfn "reqUser id: %A" requestState.Request.UserId
-            managerCancelRequest requestState 
+            | EmployeeCancelRequest _ -> Error "Manager cannot disguise in employee"
+
+        | Some Employee ->
+            match command with
+            | RequestTimeOff (request, _) ->
+                let activeRequests =
+                    userRequests
+                    |> Map.toSeq
+                    |> Seq.map (fun (_, state) -> state)
+                    |> Seq.where (fun state -> state.IsActive)
+                    |> Seq.map (fun state -> state.Request)
+
+                createRequest activeRequests request
+
+            | EmployeeCancelRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                employeeCancelRequest requestState
+
+            | ValidateRequest _ -> Error "Employee cannot validate request"
+
+            | RefuseRequest _ -> Error "Employee cannot refuse request"
+
+            | ManagerCancelRequest _ -> Error "Employee cannot disguise in manager"
+
+        | None -> Error "Cannot process unknown User"

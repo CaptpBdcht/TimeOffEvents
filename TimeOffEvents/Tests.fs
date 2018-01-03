@@ -30,7 +30,7 @@ let creationTests =
   testList "Creation tests" [
     test "A request is created in the future" {
       Given [ ]
-      |> When (RequestTimeOff requestMock)
+      |> When (RequestTimeOff (requestMock, User.Employee))
       |> Then (Ok [RequestCreated requestMock]) "The request has been created"
     }
 
@@ -42,7 +42,7 @@ let creationTests =
         End = { Date = INNDAYS 10.; HalfDay = PM } }
 
       Given [ ]
-      |> When (RequestTimeOff request)
+      |> When (RequestTimeOff (request, User.Employee))
       |> Then (Error "The request should start at least tomorrow") ""
     }
 
@@ -54,7 +54,7 @@ let creationTests =
         End = { Date = INNDAYS 15.; HalfDay = PM } }
 
       Given [ RequestValidated requestMock]
-      |> When (RequestTimeOff notOverlapping)
+      |> When (RequestTimeOff (notOverlapping, User.Employee))
       |> Then (Ok [RequestCreated notOverlapping]) "The request has been created"
     }
 
@@ -87,15 +87,15 @@ let creationTests =
         End = { Date = INNDAYS 12.; HalfDay = PM } }
 
       Given [ RequestValidated request ]
-      |> When (RequestTimeOff overlappingAll)
+      |> When (RequestTimeOff (overlappingAll, User.Employee))
       |> Then (Error "Overlapping request") ""
 
       Given [ RequestValidated request ]
-      |> When (RequestTimeOff overlappingLeft)
+      |> When (RequestTimeOff (overlappingLeft, User.Employee))
       |> Then (Error "Overlapping request") ""
 
       Given [ RequestValidated request ]
-      |> When (RequestTimeOff overlappingRight)
+      |> When (RequestTimeOff (overlappingRight, User.Employee))
       |> Then (Error "Overlapping request") ""
     }
   ]
@@ -104,7 +104,7 @@ let validationTests =
   testList "Validation tests" [
     test "A request is validated" {
       Given [ RequestCreated requestMock ]
-      |> When (ValidateRequest (1, Guid.Empty))
+      |> When (ValidateRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestValidated requestMock]) "The request has been validated"
     }
   ]
@@ -113,19 +113,19 @@ let refusalTests =
   testList "Refusal tests" [
     test "A request is refused" {
       Given [ RequestCreated requestMock ]
-      |> When (RefuseRequest (1, Guid.Empty))
+      |> When (RefuseRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestRefused requestMock]) "The request has been refused"
     }
 
     test "A request is already refused" {
       Given [ RequestRefused requestMock ]
-      |> When (RefuseRequest (1, Guid.Empty))
+      |> When (RefuseRequest (1, Guid.Empty, User.Manager))
       |> Then (Error "Request already refused") ""
     }
     
     test "A request cannot be refused" {
       Given [ RequestValidated requestMock ]
-      |> When (RefuseRequest (1, Guid.Empty))
+      |> When (RefuseRequest (1, Guid.Empty, User.Manager))
       |> Then (Error "Request cannot be refused") ""
     }
   ]
@@ -134,7 +134,7 @@ let cancelTests =
   testList "Validation tests" [
     test "A request is cancelled when pending validation" {
       Given [ RequestCreated requestMock ]
-      |> When (ManagerCancelRequest (1, Guid.Empty))
+      |> When (ManagerCancelRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestManagerCancelled requestMock]) "The pending request has been cancelled"
     }
   ]
