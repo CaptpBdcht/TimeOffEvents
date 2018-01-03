@@ -107,6 +107,12 @@ let validationTests =
       |> When (ValidateRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestValidated requestMock]) "The request has been validated"
     }
+
+    test "A request is not validated by employee" {
+      Given [ RequestCreated requestMock ]
+      |> When (ValidateRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "Employee cannot validate request") ""
+    }
   ]
 
 let refusalTests =
@@ -115,6 +121,12 @@ let refusalTests =
       Given [ RequestCreated requestMock ]
       |> When (RefuseRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestRefused requestMock]) "The request has been refused"
+    }
+
+    test "A request is not refused by employee" {
+      Given [ RequestCreated requestMock ]
+      |> When (RefuseRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "Employee cannot refuse request") ""
     }
 
     test "A request is already refused" {
@@ -131,11 +143,50 @@ let refusalTests =
   ]
 
 let cancelTests =
-  testList "Validation tests" [
-    test "A request is cancelled when pending validation" {
+  testList "Cancellation tests" [
+    test "A pending request is cancelled by manager" {
       Given [ RequestCreated requestMock ]
       |> When (ManagerCancelRequest (1, Guid.Empty, User.Manager))
       |> Then (Ok [RequestManagerCancelled requestMock]) "The pending request has been cancelled"
+    }
+
+    test "A pending request is cancelled by employee" {
+      Given [ RequestCreated requestMock ]
+      |> When (EmployeeCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Ok [RequestEmployeeCancelled requestMock]) "The pending request has been cancelled"
+    }
+
+    test "A validated request is cancelled by employee" {
+      Given [ RequestValidated requestMock ]
+      |> When (EmployeeCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Ok [RequestEmployeeCancelled requestMock]) "The validated has been cancelled"
+    }
+
+    test "Other requests cannot be cancelled by employee" {
+      Given [ RequestManagerCancelled requestMock ]
+      |> When (EmployeeCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "Request cannot be cancelled") ""
+    }
+  ]
+
+let askCancelTests =
+  testList "Ask cancel tests" [
+    test "Validated requests can be cancelled" {
+      Given [ RequestValidated requestMock ]
+      |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Ok [RequestAskCancelled requestMock]) "The validated has been asked cancelation"
+    }
+
+    test "Pending ones shows lazy boys" {
+      Given [ RequestCreated requestMock ]
+      |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "You can cancel that by yourself!") ""
+    }
+
+    test "Others can't be" {
+      Given [ RequestRefused requestMock ]
+      |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Error "Request cannot be asked cancellation") ""
     }
   ]
 
@@ -145,4 +196,5 @@ let tests =
     validationTests
     refusalTests
     cancelTests
+    askCancelTests
   ]

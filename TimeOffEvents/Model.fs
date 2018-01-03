@@ -26,6 +26,7 @@ type Command =
     | RefuseRequest of UserId * Guid * User
     | EmployeeCancelRequest of UserId * Guid * User
     | ManagerCancelRequest of UserId * Guid * User
+    | AskCancelRequest of UserId * Guid * User
     | ValidateRequest of UserId * Guid * User with
     member this.UserId =
         match this with
@@ -33,6 +34,7 @@ type Command =
         | RefuseRequest (userId, _, _) -> userId
         | EmployeeCancelRequest (userId, _, _) -> userId
         | ManagerCancelRequest (userId, _, _) -> userId
+        | AskCancelRequest (userId, _, _) -> userId
         | ValidateRequest (userId, _, _) -> userId
     member this.User =
         match this with
@@ -40,6 +42,7 @@ type Command =
         | RefuseRequest (_, _, user) -> Some user
         | EmployeeCancelRequest (_, _, user) -> Some user
         | ManagerCancelRequest (_, _, user) -> Some user
+        | AskCancelRequest (_, _, user) -> Some user
         | ValidateRequest (_, _, user) -> Some user
 
 type RequestEvent =
@@ -47,6 +50,7 @@ type RequestEvent =
     | RequestRefused of TimeOffRequest
     | RequestEmployeeCancelled of TimeOffRequest
     | RequestManagerCancelled of TimeOffRequest
+    | RequestAskCancelled of TimeOffRequest
     | RequestValidated of TimeOffRequest with
     member this.Request =
         match this with
@@ -54,6 +58,7 @@ type RequestEvent =
         | RequestRefused request -> request
         | RequestEmployeeCancelled request -> request
         | RequestManagerCancelled request -> request
+        | RequestAskCancelled request -> request
         | RequestValidated request -> request
 
 module Logic =
@@ -64,6 +69,7 @@ module Logic =
         | Refused of TimeOffRequest
         | EmployeeCancelled of TimeOffRequest
         | ManagerCancelled of TimeOffRequest
+        | AskToCancel of TimeOffRequest
         | Validated of TimeOffRequest with
         member this.Request =
             match this with
@@ -72,14 +78,16 @@ module Logic =
             | Refused request -> request
             | EmployeeCancelled request -> request
             | ManagerCancelled request -> request
+            | AskToCancel request -> request
             | Validated request -> request
         member this.IsActive =
             match this with
             | NotCreated -> false
-            | PendingValidation _
+            | PendingValidation _ -> true
             | Refused _ -> false
             | EmployeeCancelled _ -> false
             | ManagerCancelled _ -> false
+            | AskToCancel _ -> true
             | Validated _ -> true
 
     let evolve _ event =
@@ -88,6 +96,7 @@ module Logic =
         | RequestRefused request -> Refused request
         | RequestEmployeeCancelled request -> EmployeeCancelled request
         | RequestManagerCancelled request -> ManagerCancelled request
+        | RequestAskCancelled request -> AskToCancel request
         | RequestValidated request -> Validated request
 
     let getRequestState events =
@@ -151,7 +160,7 @@ module Logic =
         | Validated request ->
             Ok [RequestEmployeeCancelled request]
         | _ ->
-            Error "Request cannot be refused"
+            Error "Request cannot be cancelled"
 
     let managerCancelRequest requestState =
         match requestState with
@@ -159,7 +168,16 @@ module Logic =
         | Validated request ->
             Ok [RequestManagerCancelled request]
         | _ ->
-            Error "Request cannot be refused"
+            Error "Request cannot be cancelled"
+
+    let askCancelRequest requestState =
+        match requestState with
+        | Validated request ->
+            Ok [RequestAskCancelled request]
+        | PendingValidation _ ->
+            Error "You can cancel that by yourself!"
+        | _ ->
+            Error "Request cannot be asked cancellation"
 
     let handleCommand (store: IStore<UserId, RequestEvent>) (command: Command) =
         let userId = command.UserId
@@ -192,6 +210,10 @@ module Logic =
                 let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
                 managerCancelRequest requestState
 
+            | AskCancelRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                askCancelRequest requestState
+
             | EmployeeCancelRequest _ -> Error "Manager cannot disguise in employee"
 
         | Some Employee ->
@@ -209,6 +231,10 @@ module Logic =
             | EmployeeCancelRequest (_, requestId, _) ->
                 let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
                 employeeCancelRequest requestState
+
+            | AskCancelRequest (_, requestId, _) ->
+                let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+                askCancelRequest requestState
 
             | ValidateRequest _ -> Error "Employee cannot validate request"
 
