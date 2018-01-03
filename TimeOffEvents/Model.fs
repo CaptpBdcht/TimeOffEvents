@@ -113,6 +113,11 @@ module Logic =
 
         events |> Seq.fold folder Map.empty
 
+    let getUserRequests (store: IStore<UserId, RequestEvent>) userId = 
+        let stream = store.GetStream userId
+        let events = stream.ReadAll()
+        getAllRequests events
+
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
         let overlapsWith request otherRequest =
             let beforeOrEqual boundary1 boundary2 =
@@ -161,24 +166,24 @@ module Logic =
         match requestState with
         | PendingValidation request
         | Validated request ->
-            if requestState.Request.Start > Date.Now then
+            if requestState.Request.Start.Date > DateTime.Now then
                 Ok [RequestEmployeeCancelled request]
             else
                 Error "Cannor cancel a timeoff that already started"
         | _ ->
             Error "Request cannot be cancelled"
 
-    let managerCancelRequest requestState =
-        match requestState with
-        | IsActive request ->
-            Ok [RequestManagerCancelled request]
-        | _ ->
+    let managerCancelRequest (requestState: RequestState) =
+        if requestState.IsActive then
+            Ok [RequestManagerCancelled requestState.Request]
+        else
             Error "Request cannot be cancelled"
 
     let askCancelRequest requestState =
         match requestState with
         | Validated request ->
-            if requestState.Request.Start < Date.Now || requestState.Request.Start.Equals Date.Now then
+            // TODO: Check failing test
+            if requestState.Request.Start.Date < DateTime.Now || requestState.Request.Start.Date.Equals DateTime.Now then
                 Ok [RequestAskCancelled request]
             else
                 Error "Cannot ask cancel for a timeoff in the future"
@@ -196,11 +201,23 @@ module Logic =
         | _ ->
             Error "Request cannot be refused cancellation"
 
+    let effectiveTimeoffRequests activeRequests = 
+        let effectiveRequests = 
+            activeRequests
+            |> Seq.filter (fun request -> request.Start.Date < DateTime.Now && request.End.Date > DateTime.Now)
+
+        Ok effectiveRequests
+
+    let plannedTimeoffRequests activeRequests = 
+        let plannedRequests =
+            activeRequests
+            |> Seq.filter (fun request -> request.Start.Date > DateTime.Now)
+
+        Ok plannedRequests
+
+
     let handleCommand (store: IStore<UserId, RequestEvent>) (command: Command) =
-        let userId = command.UserId
-        let stream = store.GetStream userId
-        let events = stream.ReadAll()
-        let userRequests = getAllRequests events
+        let userRequests = getUserRequests store command.UserId
 
         match command.User with
         | Some Manager ->
@@ -267,5 +284,33 @@ module Logic =
 
         | None -> Error "Cannot process unknown User"
 
+
     let cumulativeBalance (date: DateTime) (timeoffPerMonth: float) = 
         (float date.Month - 1.) * timeoffPerMonth
+
+
+    let effectiveRequests store userId = 
+        let userRequests = getUserRequests store userId
+        let activeRequests =
+            userRequests
+            |> Map.toSeq
+            |> Seq.map (fun (_, state) -> state)
+            |> Seq.where (fun state -> state.IsActive)
+            |> Seq.map (fun state -> state.Request)
+        
+        effectiveTimeoffRequests activeRequests
+
+
+    let plannedRequests store userId = 
+        let userRequests = getUserRequests store userId
+        let activeRequests =
+            userRequests
+            |> Map.toSeq
+            |> Seq.map (fun (_, state) -> state)
+            |> Seq.where (fun state -> state.IsActive)
+            |> Seq.map (fun state -> state.Request)
+        
+        plannedTimeoffRequests activeRequests
+
+    let requestsDuration (requests: seq<TimeOffRequest>) = 
+        Seq.sumBy (fun req -> (req.End.Date.Subtract req.Start.Date).Days) requests

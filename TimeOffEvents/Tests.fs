@@ -172,6 +172,7 @@ let cancelTests =
 
 let askCancelTests =
   testList "Ask cancel tests" [
+    // TODO: Check failing test
     test "Validated requests can be cancelled" {
       Given [ RequestValidated requestMock ]
       |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
@@ -217,7 +218,7 @@ let timeoffCalculationTests =
     test "Sum of timeoffs during 6 months" {
       let expected = 5.
 
-      let date = new DateTime(2017, 3, 1, 0, 0, 0, 0)
+      let date = DateTime(2017, 3, 1, 0, 0, 0, 0)
       let timeoffPerMonth = 2.5
       let sumOfTimeoffs = Logic.cumulativeBalance date timeoffPerMonth
 
