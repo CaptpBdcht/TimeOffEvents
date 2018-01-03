@@ -34,17 +34,17 @@ let creationTests =
       |> Then (Ok [RequestCreated request]) "The request has been created"
     }
 
-    // test "A request is created today" {
-    //   let request = {
-    //     UserId = 1
-    //     RequestId = Guid.Empty
-    //     Start = { Date = TODAY; HalfDay = AM }
-    //     End = { Date = INNDAYS 10.; HalfDay = PM } }
+    test "A request is created today" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = TODAY; HalfDay = AM }
+        End = { Date = INNDAYS 10.; HalfDay = PM } }
 
-    //   Given [ ]
-    //   |> When (RequestTimeOff request)
-    //   |> Then (Ok [RequestCreated request]) "The request has been created"
-    // }
+      Given [ ]
+      |> When (RequestTimeOff request)
+      |> Then (Error "The request should start at least tomorrow") ""
+    }
 
     test "A new request doesn't overlap" {
       let request = {
@@ -86,7 +86,6 @@ let creationTests =
         Start = { Date = TODAY; HalfDay = AM }
         End = requestStart }
 
-      // This edge case doesn't work right now
       let overlappingRight = {
         UserId = 1
         RequestId = Guid.Empty
@@ -122,8 +121,48 @@ let validationTests =
     }
   ]
 
+let refusalTests =
+  testList "Refusal tests" [
+    test "A request is refused" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM } }
+
+      Given [ RequestCreated request ]
+      |> When (RefuseRequest (1, Guid.Empty))
+      |> Then (Ok [RequestRefused request]) "The request has been refused"
+    }
+
+    test "A request is already refused" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM } }
+
+      Given [ RequestRefused request ]
+      |> When (RefuseRequest (1, Guid.Empty))
+      |> Then (Error "Request already refused") ""
+    }
+    
+    test "A request cannot be refused" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM } }
+
+      Given [ RequestValidated request ]
+      |> When (RefuseRequest (1, Guid.Empty))
+      |> Then (Error "Request cannot be refused") ""
+    }
+  ]
+
 let tests =
   testList "All tests" [
     creationTests
     validationTests
+    refusalTests
   ]

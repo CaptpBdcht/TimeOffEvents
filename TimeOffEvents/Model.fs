@@ -25,18 +25,22 @@ type TimeOffRequest = {
 
 type Command =
     | RequestTimeOff of TimeOffRequest
+    | RefuseRequest of UserId * Guid 
     | ValidateRequest of UserId * Guid with
     member this.UserId =
         match this with
         | RequestTimeOff request -> request.UserId
+        | RefuseRequest (userId, _) -> userId
         | ValidateRequest (userId, _) -> userId
 
 type RequestEvent =
     | RequestCreated of TimeOffRequest
+    | RequestRefused of TimeOffRequest
     | RequestValidated of TimeOffRequest with
     member this.Request =
         match this with
         | RequestCreated request -> request
+        | RequestRefused request -> request
         | RequestValidated request -> request
 
 module Logic =
@@ -44,21 +48,25 @@ module Logic =
     type RequestState =
         | NotCreated
         | PendingValidation of TimeOffRequest
+        | Refused of TimeOffRequest
         | Validated of TimeOffRequest with
         member this.Request =
             match this with
             | NotCreated -> invalidOp "Not created"
             | PendingValidation request
+            | Refused request -> request
             | Validated request -> request
         member this.IsActive =
             match this with
             | NotCreated -> false
             | PendingValidation _
+            | Refused _ -> false
             | Validated _ -> true
 
     let evolve _ event =
         match event with
         | RequestCreated request -> PendingValidation request
+        | RequestRefused request -> Refused request
         | RequestValidated request -> Validated request
 
     let getRequestState events =
@@ -75,11 +83,6 @@ module Logic =
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
         let overlapsWith request otherRequest =
             let beforeOrEqual boundary1 boundary2 =
-                // printfn "%A" boundary1
-                // printfn "%A" boundary2
-                // printfn "%A" (boundary1.Date.Equals boundary2.Date)
-                // printfn "%A" (boundary1.HalfDay.Equals boundary2.HalfDay)
-                // printfn "------------------------"
                 (boundary1.Date < boundary2.Date) ||
                 (boundary1.Date.Equals boundary2.Date && boundary1.HalfDay.Equals boundary2.HalfDay)
 
@@ -89,10 +92,14 @@ module Logic =
         Seq.exists (overlapsWith request) previousRequests
 
     let createRequest previousRequests request =
+        let today = DateTime.Now;
+
+        // Un employé ne peut pas faire une demande qui superpose une plage existante<
         if overlapWithAnyRequest previousRequests request then
             Error "Overlapping request"
-        elif request.Start.Date <= DateTime.Today then
-            Error "The request starts in the past"
+        // "Un employé peut uniquement effectuer des demandes qui commencent à une date future"
+        elif request.Start.Date < today || request.Start.Date.Equals today then
+            Error "The request should start at least tomorrow"
         else
             Ok [RequestCreated request]
 
@@ -102,6 +109,15 @@ module Logic =
             Ok [RequestValidated request]
         | _ ->
             Error "Request cannot be validated"
+    
+    let refuseRequest requestState =
+        match requestState with
+        | PendingValidation request ->
+            Ok [RequestRefused request]
+        | Refused _ ->
+            Error "Request already refused"
+        | _ ->
+            Error "Request cannot be refused"
 
     let handleCommand (store: IStore<UserId, RequestEvent>) (command: Command) =
         let userId = command.UserId
@@ -124,3 +140,7 @@ module Logic =
         | ValidateRequest (_, requestId) ->
             let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
             validateRequest requestState
+
+        | RefuseRequest (_, requestId) ->
+            let requestState = defaultArg (userRequests.TryFind requestId) NotCreated
+            refuseRequest requestState 
