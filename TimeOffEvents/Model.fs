@@ -262,3 +262,6 @@ module Logic =
             | RefuseCancelRequest _ -> Error "Employee cannot refuse cancellation"
 
         | None -> Error "Cannot process unknown User"
+
+    let cumulativeBalance (date: DateTime) (timeoffPerMonth: float) = 
+        (float date.Month - 1.) * timeoffPerMonth

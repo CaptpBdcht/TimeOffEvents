@@ -24,7 +24,8 @@ let requestMock = {
   UserId = 1
   RequestId = Guid.Empty
   Start = { Date = TOMORROW; HalfDay = AM }
-  End = { Date = INNDAYS 5.; HalfDay = PM } }
+  End = { Date = INNDAYS 5.; HalfDay = PM }
+}
 
 let creationTests =
   testList "Creation tests" [
@@ -211,6 +212,19 @@ let refuseCancelTests =
     }
   ]
 
+let timeoffCalculationTests =
+  testList "Timeoff calculation tests" [
+    test "Sum of timeoffs during 6 months" {
+      let expected = 5.
+
+      let date = new DateTime(2017, 3, 1, 0, 0, 0, 0)
+      let timeoffPerMonth = 2.5
+      let sumOfTimeoffs = Logic.cumulativeBalance date timeoffPerMonth
+
+      Expect.equal sumOfTimeoffs expected "The sum of timeoffs didn't match the expected result"
+    }
+  ]
+
 let tests =
   testList "All tests" [
     creationTests
@@ -219,4 +233,5 @@ let tests =
     cancelTests
     askCancelTests
     refuseCancelTests
+    timeoffCalculationTests
   ]
