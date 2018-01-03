@@ -73,7 +73,15 @@ module Logic =
         events |> Seq.fold folder Map.empty
 
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
-        false //TODO
+        let overlapsWith request otherRequest = 
+            let leftOverlap req otherReq = 
+                req.Start.Date <= otherReq.Start.Date &&
+                otherReq.Start.Date <= req.End.Date &&
+                req.End.Date <= otherReq.End.Date
+
+            leftOverlap request otherRequest || leftOverlap otherRequest request
+
+        Seq.exists (overlapsWith request) previousRequests
 
     let createRequest previousRequests request =
         if overlapWithAnyRequest previousRequests request then
