@@ -75,12 +75,13 @@ module Logic =
     let overlapWithAnyRequest (previousRequests: TimeOffRequest seq) request =
         let overlapsWith request otherRequest =
             let beforeOrEqual boundary1 boundary2 =
-                printfn "%A" boundary1
-                printfn "%A" boundary2
-                printfn "%A" (boundary1.HalfDay.Equals AM)
-                printfn "%A" (boundary2.HalfDay.Equals PM)
-                printfn "------------------------"
-                boundary1.Date < boundary2.Date
+                // printfn "%A" boundary1
+                // printfn "%A" boundary2
+                // printfn "%A" (boundary1.Date.Equals boundary2.Date)
+                // printfn "%A" (boundary1.HalfDay.Equals boundary2.HalfDay)
+                // printfn "------------------------"
+                (boundary1.Date < boundary2.Date) ||
+                (boundary1.Date.Equals boundary2.Date && boundary1.HalfDay.Equals boundary2.HalfDay)
 
             beforeOrEqual otherRequest.Start request.End &&
             beforeOrEqual request.Start otherRequest.End

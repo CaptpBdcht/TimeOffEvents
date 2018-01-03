@@ -15,32 +15,49 @@ let Then expected message (events: RequestEvent list, command) =
 
 open System
 
+let YESTERDAY = (DateTime.Now).AddDays(-1.);
+let TODAY = DateTime.Now;
+let TOMORROW = (DateTime.Now).AddDays(1.);
+let INNDAYS n = (DateTime.Now).AddDays(n);
+
 let creationTests =
   testList "Creation tests" [
-    test "A request is created" {
+    test "A request is created in the future" {
       let request = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 7); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 10.; HalfDay = PM } }
 
       Given [ ]
       |> When (RequestTimeOff request)
       |> Then (Ok [RequestCreated request]) "The request has been created"
     }
 
+    // test "A request is created today" {
+    //   let request = {
+    //     UserId = 1
+    //     RequestId = Guid.Empty
+    //     Start = { Date = TODAY; HalfDay = AM }
+    //     End = { Date = INNDAYS 10.; HalfDay = PM } }
+
+    //   Given [ ]
+    //   |> When (RequestTimeOff request)
+    //   |> Then (Ok [RequestCreated request]) "The request has been created"
+    // }
+
     test "A new request doesn't overlap" {
       let request = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 7); HalfDay = PM }
-        End = { Date = DateTime(2018, 2, 10); HalfDay = PM } }
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM } }
 
       let notOverlapping = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 7); HalfDay = AM } }
+        Start = { Date = INNDAYS 10.; HalfDay = AM }
+        End = { Date = INNDAYS 15.; HalfDay = PM } }
 
       Given [ RequestValidated request]
       |> When (RequestTimeOff notOverlapping)
@@ -48,33 +65,33 @@ let creationTests =
     }
 
     test "A request overlaps" {
-      let requestStart = { Date = DateTime(2018, 2, 10); HalfDay = AM }
-      let requestEnd = { Date = DateTime(2018, 2, 20); HalfDay = PM }
+      let requestStart = { Date = INNDAYS 3.; HalfDay = AM }
+      let requestEnd = { Date = INNDAYS 10.; HalfDay = PM }
 
       let request = {
         UserId = 1
         RequestId = Guid.Empty
         Start = requestStart
-        End = { Date = DateTime(2018, 2, 20); HalfDay = PM } }
+        End = requestEnd }
 
       let overlappingAll = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
-        End = { Date = DateTime(2018, 2, 25); HalfDay = PM } }
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 12.; HalfDay = PM } }
 
       let overlappingLeft = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2018, 2, 5); HalfDay = AM }
+        Start = { Date = TODAY; HalfDay = AM }
         End = requestStart }
 
       // This edge case doesn't work right now
-      // let overlappingRight = {
-      //   UserId = 1
-      //   RequestId = Guid.Empty
-      //   Start = requestEnd
-      //   End = { Date = DateTime(2018, 2, 25); HalfDay = PM } }
+      let overlappingRight = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = requestEnd
+        End = { Date = INNDAYS 12.; HalfDay = PM } }
 
       Given [ RequestValidated request ]
       |> When (RequestTimeOff overlappingAll)
@@ -84,9 +101,9 @@ let creationTests =
       |> When (RequestTimeOff overlappingLeft)
       |> Then (Error "Overlapping request") ""
 
-      // Given [ RequestValidated request ]
-      // |> When (RequestTimeOff overlappingRight)
-      // |> Then (Error "Overlapping request") ""
+      Given [ RequestValidated request ]
+      |> When (RequestTimeOff overlappingRight)
+      |> Then (Error "Overlapping request") ""
     }
   ]
 
@@ -96,8 +113,8 @@ let validationTests =
       let request = {
         UserId = 1
         RequestId = Guid.Empty
-        Start = { Date = DateTime(2017, 12, 30); HalfDay = AM }
-        End = { Date = DateTime(2017, 12, 30); HalfDay = PM } }
+        Start = { Date = TOMORROW; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM } }
 
       Given [ RequestCreated request ]
       |> When (ValidateRequest (1, Guid.Empty))
