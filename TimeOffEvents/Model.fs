@@ -16,6 +16,13 @@ type Boundary = {
 
 type UserId = int
 
+type UserInfo = {
+    UserId: UserId
+    Role: User
+}
+
+
+
 type TimeOffRequest = {
     UserId: UserId
     RequestId: Guid
@@ -156,6 +163,7 @@ module Logic =
         let stream = store.GetStream userId
         let events = stream.ReadAll()
         let userRequests = getAllRequests events
+        printfn "%A" userRequests
 
         match command with
         | RequestTimeOff request ->

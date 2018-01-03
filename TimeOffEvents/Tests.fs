@@ -134,7 +134,7 @@ let cancelTests =
   testList "Validation tests" [
     test "A request is cancelled when pending validation" {
       Given [ RequestCreated requestMock ]
-      |> When (ManagerCancelRequest (2, Guid.Empty))
+      |> When (ManagerCancelRequest (1, Guid.Empty))
       |> Then (Ok [RequestManagerCancelled requestMock]) "The pending request has been cancelled"
     }
   ]
