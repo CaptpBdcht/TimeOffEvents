@@ -15,10 +15,10 @@ let Then expected message (events: RequestEvent list, command) =
 
 open System
 
-let YESTERDAY = (DateTime.Now).AddDays(-1.);
 let TODAY = DateTime.Now;
-let TOMORROW = (DateTime.Now).AddDays(1.);
-let INNDAYS n = (DateTime.Now).AddDays(n);
+let YESTERDAY = TODAY.AddDays(-1.);
+let TOMORROW = TODAY.AddDays(1.);
+let INNDAYS n = TODAY.AddDays(n);
 
 let requestMock = {
   UserId = 1
