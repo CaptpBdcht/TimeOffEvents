@@ -182,7 +182,6 @@ module Logic =
     let askCancelRequest requestState =
         match requestState with
         | Validated request ->
-            // TODO: Check failing test
             if requestState.Request.Start.Date < DateTime.Now || requestState.Request.Start.Date.Equals DateTime.Now then
                 Ok [RequestAskCancelled request]
             else
@@ -215,6 +214,12 @@ module Logic =
 
         Ok plannedRequests
 
+    let filterActives (requests: Map<Guid, RequestState>) =
+        requests
+        |> Map.toSeq
+        |> Seq.map (fun (_, state) -> state)
+        |> Seq.where (fun state -> state.IsActive)
+        |> Seq.map (fun state -> state.Request)
 
     let handleCommand (store: IStore<UserId, RequestEvent>) (command: Command) =
         let userRequests = getUserRequests store command.UserId
@@ -223,13 +228,7 @@ module Logic =
         | Some Manager ->
             match command with
             | RequestTimeOff (request, _) ->
-                let activeRequests =
-                    userRequests
-                    |> Map.toSeq
-                    |> Seq.map (fun (_, state) -> state)
-                    |> Seq.where (fun state -> state.IsActive)
-                    |> Seq.map (fun state -> state.Request)
-
+                let activeRequests = filterActives userRequests
                 createRequest activeRequests request
 
             | ValidateRequest (_, requestId, _) ->
@@ -257,13 +256,7 @@ module Logic =
         | Some Employee ->
             match command with
             | RequestTimeOff (request, _) ->
-                let activeRequests =
-                    userRequests
-                    |> Map.toSeq
-                    |> Seq.map (fun (_, state) -> state)
-                    |> Seq.where (fun state -> state.IsActive)
-                    |> Seq.map (fun state -> state.Request)
-
+                let activeRequests = filterActives userRequests
                 createRequest activeRequests request
 
             | EmployeeCancelRequest (_, requestId, _) ->
@@ -284,31 +277,18 @@ module Logic =
 
         | None -> Error "Cannot process unknown User"
 
-
     let cumulativeBalance (date: DateTime) (timeoffPerMonth: float) = 
         (float date.Month - 1.) * timeoffPerMonth
 
-
     let effectiveRequests store userId = 
         let userRequests = getUserRequests store userId
-        let activeRequests =
-            userRequests
-            |> Map.toSeq
-            |> Seq.map (fun (_, state) -> state)
-            |> Seq.where (fun state -> state.IsActive)
-            |> Seq.map (fun state -> state.Request)
+        let activeRequests = filterActives userRequests
         
         effectiveTimeoffRequests activeRequests
 
-
     let plannedRequests store userId = 
         let userRequests = getUserRequests store userId
-        let activeRequests =
-            userRequests
-            |> Map.toSeq
-            |> Seq.map (fun (_, state) -> state)
-            |> Seq.where (fun state -> state.IsActive)
-            |> Seq.map (fun state -> state.Request)
+        let activeRequests = filterActives userRequests
         
         plannedTimeoffRequests activeRequests
 
