@@ -203,16 +203,16 @@ module Logic =
     let effectiveTimeoffRequests activeRequests = 
         let effectiveRequests = 
             activeRequests
-            |> Seq.filter (fun request -> request.Start.Date < DateTime.Now && request.End.Date > DateTime.Now)
+            |> Seq.filter (fun request -> request.Start.Date < DateTime.Now)
 
-        Ok effectiveRequests
+        Ok (Seq.toList effectiveRequests)
 
     let plannedTimeoffRequests activeRequests = 
         let plannedRequests =
             activeRequests
             |> Seq.filter (fun request -> request.Start.Date > DateTime.Now)
 
-        Ok plannedRequests
+        Ok (Seq.toList plannedRequests)
 
     let filterActives (requests: Map<Guid, RequestState>) =
         requests
@@ -280,11 +280,32 @@ module Logic =
     let cumulativeBalance (date: DateTime) (timeoffPerMonth: float) = 
         (float date.Month - 1.) * timeoffPerMonth
 
+    let requestDuration request = 
+        let plainDays = float (request.End.Date.Subtract request.Start.Date).Days + 1.
+        let deducedStartMorning = 
+            match request.Start.HalfDay with
+            | AM -> plainDays
+            | PM -> plainDays - 0.5
+        let deducedEndAfternoon = 
+            match request.End.HalfDay with
+            | AM -> deducedStartMorning - 0.5
+            | PM -> deducedStartMorning
+
+        deducedEndAfternoon
+
+    let requestsDuration (requests: seq<TimeOffRequest>) = 
+        Seq.sumBy requestDuration requests
+
     let effectiveRequests store userId = 
         let userRequests = getUserRequests store userId
         let activeRequests = filterActives userRequests
         
         effectiveTimeoffRequests activeRequests
+
+    let effectiveRequestsDuration store userId = 
+        match effectiveRequests store userId with
+        | Ok requests -> requestsDuration requests
+        | Error _ -> 0.
 
     let plannedRequests store userId = 
         let userRequests = getUserRequests store userId
@@ -292,5 +313,16 @@ module Logic =
         
         plannedTimeoffRequests activeRequests
 
-    let requestsDuration (requests: seq<TimeOffRequest>) = 
-        Seq.sumBy (fun req -> (req.End.Date.Subtract req.Start.Date).Days) requests
+    let plannedRequestsDuration store userId = 
+        match plannedRequests store userId with
+        | Ok requests -> requestsDuration requests
+        | Error _ -> 0.
+
+    let availableBalanceAt date store userId = 
+        let timeoffPerMonth = 2.5
+
+        let balance = cumulativeBalance date timeoffPerMonth
+        let effective = effectiveRequestsDuration store userId
+        let planned = plannedRequestsDuration store userId
+
+        balance - (float (effective + planned))
