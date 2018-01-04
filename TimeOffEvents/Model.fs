@@ -214,10 +214,14 @@ module Logic =
 
         Ok (Seq.toList plannedRequests)
 
-    let filterActives (requests: Map<Guid, RequestState>) =
+    let userRequestsToStates requests = 
         requests
         |> Map.toSeq
         |> Seq.map (fun (_, state) -> state)
+
+    let filterActives (requests: Map<Guid, RequestState>) =
+        requests
+        |> userRequestsToStates
         |> Seq.where (fun state -> state.IsActive)
         |> Seq.map (fun state -> state.Request)
 
@@ -326,3 +330,10 @@ module Logic =
         let planned = plannedRequestsDuration store userId
 
         balance - (float (effective + planned))
+    
+    let getUserRequestsChronologicallySorted store userId = 
+        getUserRequests store userId
+        |> userRequestsToStates
+        |> Seq.map (fun state -> state.Request)
+        |> Seq.sortBy (fun req -> req.Start.Date)
+        |> Seq.toList

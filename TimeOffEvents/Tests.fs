@@ -307,6 +307,33 @@ let timeoffCalculationTests =
     }
   ]
 
+let timeoffHistoryTests =
+  let mockedStoreContent = [
+    RequestValidated {
+      UserId = 1
+      RequestId = Guid.NewGuid()
+      Start = { Date = TOMORROW; HalfDay = PM }
+      End = { Date = INNDAYS 5.; HalfDay = PM }
+    }
+    RequestValidated {
+      UserId = 1
+      RequestId = Guid.NewGuid()
+      Start = { Date = INNDAYS -15.; HalfDay = AM }
+      End = { Date = INNDAYS -10.; HalfDay = AM }
+    }
+  ]
+
+  test "Get all timeoff requests chronologically sorted" {
+    let expected = [
+      mockedStoreContent.[1].Request
+      (List.head mockedStoreContent).Request
+    ]
+
+    Given mockedStoreContent
+      |> WhenIsCalled Logic.getUserRequestsChronologicallySorted
+      |> ThenCallForUser 1 expected "The available balance didn't match the expected result"
+  }
+
 let tests =
   testList "All tests" [
     creationTests
@@ -316,4 +343,5 @@ let tests =
     askCancelTests
     refuseCancelTests
     timeoffCalculationTests
+    timeoffHistoryTests
   ]
