@@ -21,6 +21,15 @@ type TimeOffRequest = {
     End: Boundary
 }
 
+type TimeOffDashboard = {
+    UserId: UserId
+    CumulativeBalance: float
+    EffectiveBalance: float
+    PlannedBalance: float
+    AvailableBalance: float
+    Requests: List<TimeOffRequest>
+}
+
 type Command =
     | RequestTimeOff of TimeOffRequest * User
     | RefuseRequest of UserId * Guid * User
@@ -200,17 +209,19 @@ module Logic =
         | _ ->
             Error "Request cannot be refused cancellation"
 
-    let effectiveTimeoffRequests activeRequests = 
+    let effectiveTimeoffRequests (date: DateTime) activeRequests = 
         let effectiveRequests = 
             activeRequests
-            |> Seq.filter (fun request -> request.Start.Date < DateTime.Now)
+            |> Seq.filter (fun request -> request.Start.Date.Year = date.Year)
+            |> Seq.filter (fun request -> request.Start.Date < date)
 
         Ok (Seq.toList effectiveRequests)
 
-    let plannedTimeoffRequests activeRequests = 
+    let plannedTimeoffRequests (date: DateTime) activeRequests = 
         let plannedRequests =
             activeRequests
-            |> Seq.filter (fun request -> request.Start.Date > DateTime.Now)
+            |> Seq.filter (fun request -> request.Start.Date.Year = date.Year)
+            |> Seq.filter (fun request -> request.Start.Date > date)
 
         Ok (Seq.toList plannedRequests)
 
@@ -300,25 +311,25 @@ module Logic =
     let requestsDuration (requests: seq<TimeOffRequest>) = 
         Seq.sumBy requestDuration requests
 
-    let effectiveRequests store userId = 
+    let effectiveRequests date store userId = 
         let userRequests = getUserRequests store userId
         let activeRequests = filterActives userRequests
         
-        effectiveTimeoffRequests activeRequests
+        effectiveTimeoffRequests date activeRequests
 
-    let effectiveRequestsDuration store userId = 
-        match effectiveRequests store userId with
+    let effectiveRequestsDuration date store userId = 
+        match effectiveRequests date store userId with
         | Ok requests -> requestsDuration requests
         | Error _ -> 0.
 
-    let plannedRequests store userId = 
+    let plannedRequests date store userId = 
         let userRequests = getUserRequests store userId
         let activeRequests = filterActives userRequests
         
-        plannedTimeoffRequests activeRequests
+        plannedTimeoffRequests date activeRequests
 
-    let plannedRequestsDuration store userId = 
-        match plannedRequests store userId with
+    let plannedRequestsDuration date store userId = 
+        match plannedRequests date store userId with
         | Ok requests -> requestsDuration requests
         | Error _ -> 0.
 
@@ -326,14 +337,27 @@ module Logic =
         let timeoffPerMonth = 2.5
 
         let balance = cumulativeBalance date timeoffPerMonth
-        let effective = effectiveRequestsDuration store userId
-        let planned = plannedRequestsDuration store userId
+        let effective = effectiveRequestsDuration date store userId
+        let planned = plannedRequestsDuration date store userId
 
         balance - (float (effective + planned))
     
-    let getUserRequestsChronologicallySorted store userId = 
+    let getUserRequestsChronologicallySorted (date: DateTime) store userId = 
         getUserRequests store userId
         |> userRequestsToStates
         |> Seq.map (fun state -> state.Request)
+        |> Seq.filter (fun req -> req.Start.Date.Year = date.Year)
         |> Seq.sortBy (fun req -> req.Start.Date)
         |> Seq.toList
+
+    let aggregateDashboard date store userId = 
+        let timeoffPerMonth = 2.5
+
+        {
+            UserId = userId
+            CumulativeBalance = cumulativeBalance date timeoffPerMonth
+            EffectiveBalance = effectiveRequestsDuration date store userId
+            PlannedBalance = plannedRequestsDuration date store userId
+            AvailableBalance = availableBalanceAt date store userId
+            Requests = getUserRequestsChronologicallySorted date store userId
+        }

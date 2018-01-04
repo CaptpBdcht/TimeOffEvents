@@ -239,20 +239,20 @@ let timeoffCalculationTests =
     RequestValidated {
       UserId = 1
       RequestId = Guid.NewGuid()
-      Start = { Date = YESTERDAY; HalfDay = AM }
-      End = { Date = INNDAYS 3.; HalfDay = AM }
+      Start = { Date = DateTime(2017, 5, 31, 0, 0, 0, 0); HalfDay = AM }
+      End = { Date = DateTime(2017, 6, 4, 0, 0, 0, 0); HalfDay = AM }
     }
     RequestValidated {
       UserId = 1
       RequestId = Guid.NewGuid()
-      Start = { Date = TOMORROW; HalfDay = PM }
-      End = { Date = INNDAYS 5.; HalfDay = PM }
+      Start = { Date = DateTime(2017, 6, 2, 0, 0, 0, 0); HalfDay = PM }
+      End = { Date = DateTime(2017, 6, 6, 0, 0, 0, 0); HalfDay = PM }
     }
     RequestValidated {
       UserId = 2
       RequestId = Guid.NewGuid()
-      Start = { Date = TOMORROW; HalfDay = AM }
-      End = { Date = INNDAYS 5.; HalfDay = PM }
+      Start = { Date = DateTime(2017, 6, 2, 0, 0, 0, 0); HalfDay = AM }
+      End = { Date = DateTime(2017, 6, 6, 0, 0, 0, 0); HalfDay = PM }
     }
   ]
   
@@ -268,32 +268,36 @@ let timeoffCalculationTests =
     }
 
     test "Should return effective requests" {
+      let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
       let expected = Ok [ (List.head mockedStoreContent).Request ]
 
       Given mockedStoreContent
-      |> WhenIsCalled Logic.effectiveRequests
+      |> WhenIsCalled (Logic.effectiveRequests date)
       |> ThenCallForUser 1 expected "The returned requests didn't match the expected result"
     }
     test "Should return effective requests duration" {
+      let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
       let expected = 4.5
 
       Given mockedStoreContent
-      |> WhenIsCalled Logic.effectiveRequestsDuration
+      |> WhenIsCalled (Logic.effectiveRequestsDuration date)
       |> ThenCallForUser 1 expected "The duration of effective requests didn't match the expected result"
     }
 
     test "Should return planned requests" {
+      let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
       let expected = Ok [ mockedStoreContent.[1].Request ]
 
       Given mockedStoreContent
-      |> WhenIsCalled Logic.plannedRequests
+      |> WhenIsCalled (Logic.plannedRequests date)
       |> ThenCallForUser 1 expected "The returned requests didn't match the expected result"
     }
     test "Should return planned requests duration" {
+      let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
       let expected = 4.5
 
       Given mockedStoreContent
-      |> WhenIsCalled Logic.plannedRequestsDuration
+      |> WhenIsCalled (Logic.plannedRequestsDuration date)
       |> ThenCallForUser 1 expected "The duration of planned requests didn't match the expected result"
     }
 
@@ -305,6 +309,42 @@ let timeoffCalculationTests =
       |> WhenIsCalled (Logic.availableBalanceAt date)
       |> ThenCallForUser 1 expected "The available balance didn't match the expected result"
     }
+
+    test "TimeOffDashboard aggregation for busy year" {
+      let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
+      let expected = {
+        UserId = 1
+        CumulativeBalance = 12.5
+        EffectiveBalance = 4.5
+        PlannedBalance = 4.5
+        AvailableBalance = 3.5
+        Requests =
+          [ 
+            (List.head mockedStoreContent).Request
+            mockedStoreContent.[1].Request
+          ]
+      }
+
+      Given mockedStoreContent
+      |> WhenIsCalled (Logic.aggregateDashboard date)
+      |> ThenCallForUser 1 expected "The aggregated dashboard didn't match the expected result"
+    }
+
+    test "TimeOffDashboard aggregation for empty year" {
+      let date = DateTime(2015, 1, 1, 0, 0, 0, 0)
+      let expected = {
+        UserId = 1
+        CumulativeBalance = 0.
+        EffectiveBalance = 0.
+        PlannedBalance = 0.
+        AvailableBalance = 0.
+        Requests = []
+      }
+
+      Given mockedStoreContent
+      |> WhenIsCalled (Logic.aggregateDashboard date)
+      |> ThenCallForUser 1 expected "The aggregated dashboard didn't match the expected result"
+    }
   ]
 
 let timeoffHistoryTests =
@@ -312,25 +352,26 @@ let timeoffHistoryTests =
     RequestValidated {
       UserId = 1
       RequestId = Guid.NewGuid()
-      Start = { Date = TOMORROW; HalfDay = PM }
-      End = { Date = INNDAYS 5.; HalfDay = PM }
+      Start = { Date = DateTime(2017, 6, 2, 0, 0, 0, 0); HalfDay = PM }
+      End = { Date = DateTime(2017, 6, 6, 0, 0, 0, 0); HalfDay = PM }
     }
     RequestValidated {
       UserId = 1
       RequestId = Guid.NewGuid()
-      Start = { Date = INNDAYS -15.; HalfDay = AM }
-      End = { Date = INNDAYS -10.; HalfDay = AM }
+      Start = { Date = DateTime(2017, 5, 17, 0, 0, 0, 0); HalfDay = AM }
+      End = { Date = DateTime(2017, 5, 22, 0, 0, 0, 0); HalfDay = AM }
     }
   ]
 
   test "Get all timeoff requests chronologically sorted" {
+    let date = DateTime(2017, 6, 1, 0, 0, 0, 0)
     let expected = [
       mockedStoreContent.[1].Request
       (List.head mockedStoreContent).Request
     ]
 
     Given mockedStoreContent
-      |> WhenIsCalled Logic.getUserRequestsChronologicallySorted
+      |> WhenIsCalled (Logic.getUserRequestsChronologicallySorted date)
       |> ThenCallForUser 1 expected "The available balance didn't match the expected result"
   }
 
