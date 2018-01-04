@@ -172,11 +172,23 @@ let cancelTests =
 
 let askCancelTests =
   testList "Ask cancel tests" [
-    // TODO: Check failing test
-    test "Validated requests can be cancelled" {
+    test "Validated requests with start in past can be asked cancel" {
+      let request = {
+        UserId = 1
+        RequestId = Guid.Empty
+        Start = { Date = YESTERDAY; HalfDay = AM }
+        End = { Date = INNDAYS 5.; HalfDay = PM }
+      }
+
+      Given [ RequestValidated request ]
+      |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
+      |> Then (Ok [RequestAskCancelled request]) "The validated has been asked cancelation"
+    }
+
+    test "Validated requests with start in future cannot be asked cancel" {
       Given [ RequestValidated requestMock ]
       |> When (AskCancelRequest (1, Guid.Empty, User.Employee))
-      |> Then (Ok [RequestAskCancelled requestMock]) "The validated has been asked cancelation"
+      |> Then (Error "Cannot ask cancel for a timeoff in the future") ""
     }
 
     test "Pending ones shows lazy boys" {
